@@ -21,6 +21,8 @@ dependencies:
   provider: ^6.0.1
   get_it: ^7.2.0
   injectable: ^1.5.3
+  overlay_support: ^1.2.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

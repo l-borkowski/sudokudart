@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:sudokudart/injection.dart';
+import 'package:sudokudart/src/hook/use_bloc_listener.dart';
 import 'package:sudokudart/src/main_board/cubit/main_board_cubit.dart';
+import 'package:sudokudart/src/widgets/toast.dart';
 
 import '../settings/settings_view.dart';
 
@@ -23,21 +26,38 @@ class MainBoardPage extends StatelessWidget {
 }
 
 /// Displays a list of SampleItems.
-class MainBoard extends StatefulWidget {
+class MainBoard extends HookWidget {
   const MainBoard({
     Key? key,
   }) : super(key: key);
 
   @override
-  State<MainBoard> createState() => _MainBoardState();
-}
-
-class _MainBoardState extends State<MainBoard> {
-  @override
   Widget build(BuildContext context) {
     final cubit = context.read<MainBoardCubit>();
     final state = context.watch<MainBoardCubit>().state;
     final board = state.sudokuList;
+
+    useCubitListener<MainBoardCubit, MainBoardState>(
+      cubit,
+      (state, context) {
+        if (state.showToast) {
+          Toast.show(
+            Text(
+              state.isCorrectSudoku == true
+                  ? 'Sudoku solved correctly'
+                  : 'Not this time, there\'re some mistakes',
+            ),
+          );
+        }
+        if (state.error != null) {
+          Toast.show(
+            const Text(
+              'Only valid numbers are between 1 and 70',
+            ),
+          );
+        }
+      },
+    );
     return Scaffold(
       appBar: AppBar(
         title: const Text('Sample Items'),
@@ -57,22 +77,48 @@ class _MainBoardState extends State<MainBoard> {
         child: Column(
           children: [
             const SizedBox(height: 30),
-            Wrap(
-              runSpacing: 10,
-              children: [
-                for (var i = 0; i < state.sudokuList.length; i++)
-                  for (var j = 0; j < state.sudokuList.elementAt(i).length; j++)
-                    _NumberTile(
-                      number: state.sudokuList[i][j],
-                      onTap: () => cubit.increaseNumber(Position(i, j)),
-                      unchangeable: board[i][j] != 0,
-                    ),
-              ],
+            SizedBox(
+              width: 9 * 40,
+              child: Wrap(
+                runSpacing: 10,
+                children: [
+                  for (var i = 0; i < board.length; i++)
+                    for (var j = 0; j < board.elementAt(i).length; j++)
+                      _NumberTile(
+                        number: board[i][j],
+                        onTap: () => cubit.increaseNumber(Position(i, j)),
+                        onSecondaryTap: () =>
+                            cubit.decreaseNumber(Position(i, j)),
+                        p: Position(i, j),
+                        darkerTile: cubit.shouldChangeColor(i, j) ?? false,
+                      ),
+                ],
+              ),
             ),
             const SizedBox(height: 30),
             TextButton(
-              onPressed: () => cubit.newSudoku(),
-              child: Text('New gane'),
+              onPressed: cubit.newSudoku,
+              child: const Text('New gane'),
+            ),
+            TextButton(
+              onPressed: cubit.checkSudoku,
+              child: const Text('Check'),
+            ),
+            TextButton(
+              onPressed: cubit.showSolution,
+              child: const Text('Show solution'),
+            ),
+            const SizedBox(height: 10),
+            const Text('Number of empty squares'),
+            SizedBox(
+              width: 50,
+              child: TextField(
+                textAlign: TextAlign.center,
+                onChanged: cubit.numberChanges,
+                inputFormatters: <TextInputFormatter>[
+                  FilteringTextInputFormatter.allow(RegExp(r'[0-9]')),
+                ],
+              ),
             )
           ],
         ),
@@ -81,37 +127,43 @@ class _MainBoardState extends State<MainBoard> {
   }
 }
 
-class _NumberTile extends StatefulWidget {
-  const _NumberTile({
-    Key? key,
-    required this.number,
-    required this.onTap,
-    required this.unchangeable,
-  }) : super(key: key);
+class _NumberTile extends StatelessWidget {
+  const _NumberTile(
+      {Key? key,
+      required this.number,
+      required this.onTap,
+      required this.onSecondaryTap,
+      required this.p,
+      required this.darkerTile})
+      : super(key: key);
 
   final int number;
   final VoidCallback onTap;
-  final bool unchangeable;
+  final VoidCallback onSecondaryTap;
+  final Position p;
+  final bool darkerTile;
 
-  @override
-  State<_NumberTile> createState() => _NumberTileState();
-}
-
-class _NumberTileState extends State<_NumberTile> {
   @override
   Widget build(BuildContext context) {
+    final cubit = context.read<MainBoardCubit>();
+    final isChangeable = cubit.isChangeable(p.x, p.y);
     return GestureDetector(
-      onTap: widget.unchangeable ? () {} : widget.onTap,
+      onTap: onTap,
+      onSecondaryTap: onSecondaryTap,
       child: Container(
         height: 30,
         width: 30,
-        color: Colors.grey,
+        color: darkerTile
+            ? Colors.grey.withOpacity(0.9)
+            : Colors.grey.withOpacity(0.5),
         margin: const EdgeInsets.symmetric(horizontal: 5),
         child: Center(
           child: Text(
-            widget.number == 0 ? '' : widget.number.toString(),
+            number == 0 ? '' : number.toString(),
             style: TextStyle(
-                fontWeight: widget.unchangeable ? FontWeight.bold : null),
+              fontWeight: isChangeable ? null : FontWeight.bold,
+              color: isChangeable ? ThemeData().hintColor : null,
+            ),
           ),
         ),
       ),
