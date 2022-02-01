@@ -4,7 +4,7 @@ import 'package:overlay_support/overlay_support.dart';
 class Toast extends StatelessWidget {
   const Toast({
     Key? key,
-    this.height = 52,
+    this.height = 72,
     this.color = Colors.blue,
     this.child,
   }) : super(key: key);
